@@ -9,6 +9,8 @@
   --accent-soft: rgba(74, 222, 128, 0.12);
   --danger: #ef4444;
   --shadow: rgba(0, 0, 0, 0.25);
+  --glow: rgba(74, 222, 128, 0.28);
+  --transition: 180ms ease-out;
 }
 
 * {
@@ -32,6 +34,18 @@ body {
 .app {
   max-width: 1200px;
   margin: 0 auto;
+  animation: fadeInUp 420ms ease-out both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .header {
@@ -68,6 +82,12 @@ h1 {
   border-radius: 18px;
   padding: 20px;
   box-shadow: 0 14px 28px var(--shadow);
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition), background var(--transition);
+}
+
+.card:hover {
+  border-color: rgba(74, 222, 128, 0.38);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(74, 222, 128, 0.08);
 }
 
 .card.wide {
@@ -84,6 +104,14 @@ h2 {
   gap: 10px;
 }
 
+.input-row.stacked {
+  align-items: center;
+}
+
+#exercise-sets {
+  max-width: 110px;
+}
+
 input, select {
   width: 100%;
   background: var(--panel-strong);
@@ -92,11 +120,12 @@ input, select {
   color: var(--text);
   padding: 10px 12px;
   outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition), transform var(--transition);
 }
 
 input:focus, select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12), 0 0 20px rgba(74, 222, 128, 0.12);
 }
 
 button {
@@ -107,15 +136,16 @@ button {
   font-weight: 700;
   padding: 10px 14px;
   cursor: pointer;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition: transform var(--transition), opacity var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition);
 }
 
 button:hover {
   transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(74, 222, 128, 0.14);
 }
 
 button:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.99);
 }
 
 button.secondary {
@@ -124,10 +154,19 @@ button.secondary {
   border: 1px solid var(--border);
 }
 
+button.secondary:hover {
+  border-color: rgba(74, 222, 128, 0.38);
+  box-shadow: 0 8px 18px rgba(74, 222, 128, 0.08);
+}
+
 button.danger {
   background: rgba(239, 68, 68, 0.1);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+button.danger:hover {
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.12);
 }
 
 button.small {
@@ -148,6 +187,18 @@ li {
   gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
+  animation: listIn 220ms ease-out;
+}
+
+@keyframes listIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 li:last-child {
@@ -204,9 +255,73 @@ li.empty {
   margin-bottom: 12px;
 }
 
+.workout-header.inline-date {
+  margin-top: 8px;
+}
+
 .workout-header label {
   min-width: 90px;
   color: var(--muted);
+}
+
+.date-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.date-btn:hover {
+  border-color: rgba(74, 222, 128, 0.28);
+  box-shadow: 0 8px 18px rgba(74, 222, 128, 0.06);
+}
+
+/* Ensure buttons are above the native date input on some browsers */
+.date-controls { position: relative; }
+.date-btn { z-index: 3; }
+#workout-date-active { z-index: 1; }
+
+.date-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(255,255,255,0.02);
+  box-shadow: none;
+}
+
+/* helper text */
+.date-help {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 10px;
+}
+
+/* click/highlight animation */
+.date-btn.active {
+  transform: translateY(-2px) scale(0.98);
+  box-shadow: 0 10px 26px rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.4);
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, border-color 140ms ease-out;
+}
+
+.workout-date-label {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-left: 8px;
+  min-width: 160px;
 }
 
 .workout-actions {
@@ -220,6 +335,47 @@ li.empty {
   color: var(--muted);
   font-size: 0.8rem;
   margin-bottom: 12px;
+}
+
+.saved-workouts {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.saved-workout-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition), transform var(--transition);
+  animation: listIn 220ms ease-out;
+}
+
+.saved-workout-item:hover {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(74, 222, 128, 0.025);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.06);
+}
+
+.saved-workout-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.saved-workout-item small {
+  color: var(--muted);
+}
+
+.saved-workout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 #workout-list {
@@ -244,24 +400,33 @@ li.empty {
   font-weight: 600;
 }
 
+.workout-row {
+  display: block;
+}
+
+.workout-row .exercise-name {
+  margin-bottom: 12px;
+}
+
 .workout-row .inputs {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 10px;
-  width: min(100%, 320px);
+  width: 100%;
 }
 
 .workout-row .inputs label {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
   color: var(--muted);
   font-size: 0.83rem;
 }
 
 .workout-row input {
-  width: 110px;
-  min-width: 90px;
+  width: 100%;
+  min-width: 0;
 }
 
 .empty-state {
@@ -271,6 +436,16 @@ li.empty {
   border: 1px dashed var(--border);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
+  animation: listIn 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @media (max-width: 640px) {
@@ -282,7 +457,8 @@ li.empty {
   .day-toolbar,
   .workout-row,
   .workout-header,
-  .workout-actions {
+  .workout-actions,
+  .saved-workout-item {
     flex-direction: column;
     align-items: stretch;
   }
