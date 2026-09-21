@@ -744,6 +744,129 @@ workoutDateInput.addEventListener("change", () => {
   renderWorkout();
 });
 
+// --- Export / Import backup functionality ---
+function getExportPayload() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    state: clone(state)
+  };
+}
+
+function exportState() {
+  const payload = getExportPayload();
+  const json = JSON.stringify(payload, null, 2);
+
+  // Create a downloadable blob and click a temporary link
+  try {
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const name = `fitness-tracker-backup-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) {
+    // fallback: copy to clipboard
+    try {
+      navigator.clipboard && navigator.clipboard.writeText(json);
+    } catch (err) {}
+  }
+
+  return json;
+}
+
+// Expose programmatic API for other parts of the app or external integrations
+window.getExportPayload = getExportPayload;
+window.getBackupJSON = () => JSON.stringify(getExportPayload(), null, 2);
+window.exportData = exportState;
+
+/**
+ * Import payload from an object or JSON string programmatically.
+ * Usage: window.importData(payloadOrJsonString)
+ */
+window.importData = (input) => {
+  try {
+    const parsed = typeof input === 'string' ? JSON.parse(input) : input;
+    importStateFromObject(parsed);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+};
+
+function validateImportedPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  if (!payload.state || typeof payload.state !== "object") return false;
+  const s = payload.state;
+  if (!Array.isArray(s.exercises) || !Array.isArray(s.days)) return false;
+  if (!s.logs || typeof s.logs !== "object") return false;
+  if (!s.workouts || typeof s.workouts !== "object") return false;
+  return true;
+}
+
+function importStateFromObject(payload) {
+  if (!validateImportedPayload(payload)) {
+    throw new Error("Ungültiges Backup-Format");
+  }
+
+  // Replace current state with imported state, but ensure defaults exist
+  state = {
+    exercises: Array.isArray(payload.state.exercises) ? payload.state.exercises : clone(defaultState.exercises),
+    days: Array.isArray(payload.state.days) ? payload.state.days : clone(defaultState.days),
+    logs: payload.state.logs && typeof payload.state.logs === "object" ? payload.state.logs : {},
+    workouts: payload.state.workouts && typeof payload.state.workouts === "object" ? payload.state.workouts : {}
+  };
+
+  saveState();
+  renderAll();
+}
+
+function handleImportFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error("No file provided"));
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || ""));
+        importStateFromObject(parsed);
+        resolve(parsed);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = () => reject(new Error("Fehler beim Lesen der Datei"));
+    reader.readAsText(file);
+  });
+}
+
+// Wire up UI elements for export/import if present
+try {
+  const exportBtn = document.getElementById("export-data-btn");
+  const importBtn = document.getElementById("import-data-btn");
+  const importInput = document.getElementById("import-file-input");
+
+  if (exportBtn) exportBtn.addEventListener("click", () => {
+    exportState();
+  });
+
+  if (importBtn && importInput) {
+    importBtn.addEventListener("click", () => importInput.click());
+    importInput.addEventListener("change", (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      handleImportFile(file).catch((err) => {
+        alert('Import fehlgeschlagen: ' + (err && err.message ? err.message : 'Ungültige Datei'));
+      });
+    });
+  }
+} catch (e) {
+  // ignore UI wiring errors
+}
+
 workoutDateActiveInput.addEventListener("change", () => {
   workoutDateInput.value = workoutDateActiveInput.value;
   updateDateLabel();
