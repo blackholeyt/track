@@ -201,12 +201,25 @@ li.empty {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .workout-header label {
   min-width: 90px;
   color: var(--muted);
+}
+
+.workout-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.workout-meta {
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 12px;
 }
 
 #workout-list {
@@ -268,7 +281,8 @@ li.empty {
   .input-row,
   .day-toolbar,
   .workout-row,
-  .workout-header {
+  .workout-header,
+  .workout-actions {
     flex-direction: column;
     align-items: stretch;
   }
