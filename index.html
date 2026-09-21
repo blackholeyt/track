@@ -13,19 +13,29 @@
           <p class="eyebrow">Minimal Tracker</p>
           <h1>Fitness Planner</h1>
         </div>
+        <div class="app-version">Build: <span id="app-version">?</span></div>
       </header>
 
       <main class="grid">
         <section class="card">
           <h2>Übungen</h2>
           <form id="exercise-form">
-            <div class="input-row">
+            <div class="input-row stacked">
               <input
                 id="exercise-name"
                 type="text"
                 placeholder="Bench Press"
                 maxlength="40"
                 autocomplete="off"
+                required
+              />
+              <input
+                id="exercise-sets"
+                type="number"
+                min="1"
+                max="12"
+                value="3"
+                placeholder="Sets"
                 required
               />
               <button type="submit">Hinzufügen</button>
@@ -52,15 +62,32 @@
           <div id="day-list"></div>
         </section>
 
+        <section class="card">
+          <h2>Kalender</h2>
+          <div class="input-row">
+            <input id="workout-date" type="date" />
+          </div>
+          <div id="saved-workouts-list" class="saved-workouts"></div>
+        </section>
+
         <section class="card wide">
           <h2>Workout-Modus</h2>
           <div class="workout-header">
             <label for="day-select">Tag auswählen</label>
             <select id="day-select"></select>
           </div>
+          <div class="workout-header inline-date">
+            <label for="workout-date-active">Datum</label>
+            <div class="date-controls">
+              <button type="button" id="date-prev" class="date-btn" data-dir="prev" aria-label="Vorheriger Tag" data-tooltip="Gehe einen Tag zurück">‹</button>
+              <input id="workout-date-active" type="date" aria-label="Ausgewähltes Datum" aria-describedby="date-help" />
+              <button type="button" id="date-next" class="date-btn" data-dir="next" aria-label="Nächster Tag" data-tooltip="Gehe einen Tag vorwärts">›</button>
+              <span id="workout-date-label" class="workout-date-label" aria-live="polite"></span>
+              <small id="date-help" class="date-help">Mit den Pfeiltasten oder den Buttons Datum vor-/zurückspringen.</small>
+            </div>
+          </div>
           <div class="workout-actions">
             <button type="button" id="save-workout-btn">Workout speichern</button>
-            <button type="button" id="load-workout-btn" class="secondary">Workout laden</button>
           </div>
           <div id="workout-meta" class="workout-meta"></div>
           <div id="workout-list"></div>
