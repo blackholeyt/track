@@ -14,7 +14,8 @@ const defaultState = {
     { id: "pull", name: "Pull", exercises: ["rows", "pullups"] },
     { id: "legs", name: "Legs", exercises: ["squats", "deadlifts"] }
   ],
-  logs: {}
+  logs: {},
+  workouts: {}
 };
 
 let state = loadState();
@@ -25,6 +26,9 @@ const exerciseList = document.getElementById("exercise-list");
 const dayList = document.getElementById("day-list");
 const daySelect = document.getElementById("day-select");
 const workoutList = document.getElementById("workout-list");
+const workoutMeta = document.getElementById("workout-meta");
+const saveWorkoutBtn = document.getElementById("save-workout-btn");
+const loadWorkoutBtn = document.getElementById("load-workout-btn");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -53,7 +57,8 @@ function loadState() {
     return {
       exercises: Array.isArray(saved.exercises) ? saved.exercises : clone(defaultState.exercises),
       days: Array.isArray(saved.days) ? saved.days : clone(defaultState.days),
-      logs: saved.logs && typeof saved.logs === "object" ? saved.logs : {}
+      logs: saved.logs && typeof saved.logs === "object" ? saved.logs : {},
+      workouts: saved.workouts && typeof saved.workouts === "object" ? saved.workouts : {}
     };
   } catch {
     return clone(defaultState);
@@ -70,6 +75,41 @@ function getExerciseById(id) {
 
 function getDayById(id) {
   return state.days.find((day) => day.id === id);
+}
+
+function getCurrentWorkoutForDay(dayId) {
+  return state.workouts[dayId] || { dayId, exercises: {} };
+}
+
+function normalizeWorkoutValue(value) {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+
+  return Number(value);
+}
+
+function captureWorkoutInputs(dayId) {
+  const day = getDayById(dayId);
+  if (!day) return null;
+
+  const workout = { dayId, exercises: {}, savedAt: new Date().toISOString() };
+
+  day.exercises.forEach((exerciseId) => {
+    const weightInput = document.querySelector(
+      `input[data-day-id="${dayId}"][data-exercise-id="${exerciseId}"][data-field="weight"]`
+    );
+    const repsInput = document.querySelector(
+      `input[data-day-id="${dayId}"][data-exercise-id="${exerciseId}"][data-field="reps"]`
+    );
+
+    workout.exercises[exerciseId] = {
+      weight: weightInput ? normalizeWorkoutValue(weightInput.value) : "",
+      reps: repsInput ? normalizeWorkoutValue(repsInput.value) : ""
+    };
+  });
+
+  return workout;
 }
 
 function renderExercises() {
@@ -183,26 +223,56 @@ function renderDaySelect() {
   }
 }
 
+function updateWorkoutMeta(dayId) {
+  const workout = getCurrentWorkoutForDay(dayId);
+
+  if (!dayId || !state.days.some((day) => day.id === dayId)) {
+    workoutMeta.textContent = "";
+    return;
+  }
+
+  if (workout.savedAt) {
+    const saved = new Date(workout.savedAt);
+    workoutMeta.textContent = `Letztes Workout gespeichert: ${saved.toLocaleString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    })}`;
+    return;
+  }
+
+  workoutMeta.textContent = "Noch kein Workout für diesen Tag gespeichert.";
+}
+
 function renderWorkout() {
   const selectedDayId = daySelect.value;
   const day = getDayById(selectedDayId);
 
   if (!day) {
     workoutList.innerHTML = '<div class="empty-state">Kein Tag ausgewählt.</div>';
+    workoutMeta.textContent = "";
     return;
   }
 
   if (!day.exercises.length) {
     workoutList.innerHTML = '<div class="empty-state">Dieser Tag hat noch keine Übungen.</div>';
+    updateWorkoutMeta(selectedDayId);
     return;
   }
+
+  const savedWorkout = getCurrentWorkoutForDay(day.id);
 
   workoutList.innerHTML = day.exercises
     .map((exerciseId) => {
       const exercise = getExerciseById(exerciseId);
       if (!exercise) return "";
 
-      const current = state.logs[day.id]?.[exerciseId] || { weight: "", reps: "" };
+      const current =
+        savedWorkout.exercises?.[exerciseId] ||
+        state.logs[day.id]?.[exerciseId] ||
+        { weight: "", reps: "" };
 
       return `
         <div class="workout-row">
@@ -239,12 +309,62 @@ function renderWorkout() {
       `;
     })
     .join("");
+
+  updateWorkoutMeta(day.id);
 }
 
 function renderAll() {
   renderExercises();
   renderDays();
   renderDaySelect();
+  renderWorkout();
+}
+
+function saveSelectedWorkout() {
+  const selectedDayId = daySelect.value;
+  const workout = captureWorkoutInputs(selectedDayId);
+
+  if (!workout) return;
+
+  state.workouts[selectedDayId] = workout;
+  state.logs[selectedDayId] = workout.exercises;
+  saveState();
+  renderWorkout();
+}
+
+function loadSelectedWorkout() {
+  const selectedDayId = daySelect.value;
+  const day = getDayById(selectedDayId);
+
+  if (!day) return;
+
+  const workout = getCurrentWorkoutForDay(selectedDayId);
+
+  if (!workout || !workout.exercises || !Object.keys(workout.exercises).length) {
+    renderWorkout();
+    return;
+  }
+
+  state.logs[selectedDayId] = clone(workout.exercises);
+
+  day.exercises.forEach((exerciseId) => {
+    const inputWeight = document.querySelector(
+      `input[data-day-id="${selectedDayId}"][data-exercise-id="${exerciseId}"][data-field="weight"]`
+    );
+    const inputReps = document.querySelector(
+      `input[data-day-id="${selectedDayId}"][data-exercise-id="${exerciseId}"][data-field="reps"]`
+    );
+
+    if (inputWeight) {
+      inputWeight.value = workout.exercises[exerciseId]?.weight ?? "";
+    }
+
+    if (inputReps) {
+      inputReps.value = workout.exercises[exerciseId]?.reps ?? "";
+    }
+  });
+
+  saveState();
   renderWorkout();
 }
 
@@ -404,6 +524,9 @@ daySelect.addEventListener("change", () => {
   renderWorkout();
 });
 
+saveWorkoutBtn.addEventListener("click", saveSelectedWorkout);
+loadWorkoutBtn.addEventListener("click", loadSelectedWorkout);
+
 workoutList.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) return;
@@ -425,6 +548,14 @@ workoutList.addEventListener("input", (event) => {
   }
 
   state.logs[dayId][exerciseId][field] = value === "" ? "" : Number(value);
+
+  if (state.workouts[dayId]) {
+    state.workouts[dayId].exercises[exerciseId] = {
+      ...state.workouts[dayId].exercises[exerciseId],
+      [field]: value === "" ? "" : Number(value)
+    };
+  }
+
   saveState();
 });
 
