@@ -1,507 +1,273 @@
-// app.js — Exercise & Routine Manager with localStorage persistence
-(() => {
-  const STORAGE_KEY = 'tracker.app.v1';
+import lucide from 'https://unpkg.com/lucide@0.273.0/dist/lucide.esm.js';
 
-  // Schema:
-  // {
-  //   exercises: [{id,name}],
-  //   routines: [{id,name,days:[{id,name,exercises:[{id,exerciseId,sets,reps,rest}]},...]}]
-  // }
+/* Simple UUID */
+const uid = (n=8)=>Date.now().toString(36)+Math.random().toString(36).slice(2,n+2);
 
-  function uid(prefix = '') { return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+const STORE_KEY = 'tracker.app.v1';
 
-  function loadApp() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return {exercises:[], routines:[]};
+const defaultState = () => ({
+  meta:{version:'1.0',createdAt:new Date().toISOString()},
+  settings:{defaultRest:90,units:'kg',theme:'dark'},
+  exercises:[],
+  routines:[],
+  sessions:[]
+});
+
+/* LocalStorage wrapper */
+const storage = {
+  load(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return null;
       return JSON.parse(raw);
-    } catch (e) {
-      console.error('Failed to load app state', e);
-      return {exercises:[], routines:[]};
-    }
-  }
-
-  function saveApp(state) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
-  let app = loadApp();
-
-  // --- Exercises CRUD ---
-  function addExercise(name) {
-    name = String(name || '').trim();
-    if (!name) return null;
-    const ex = { id: uid('ex_'), name };
-    app.exercises.push(ex);
-    saveApp(app);
-    renderExercises();
-    renderRoutines();
-    return ex;
-  }
-
-  function renameExercise(id, newName) {
-    const ex = app.exercises.find(e => e.id === id);
-    if (!ex) return false;
-    ex.name = String(newName||'').trim() || ex.name;
-    saveApp(app);
-    renderExercises();
-    renderRoutines();
-    return true;
-  }
-
-  function deleteExercise(id) {
-    if (!confirm('Übung löschen? Alle Referenzen in Routinen werden entfernt.')) return false;
-    app.exercises = app.exercises.filter(e => e.id !== id);
-    // remove from routines
-    app.routines.forEach(r => {
-      r.days.forEach(d => {
-        d.exercises = d.exercises.filter(x => x.exerciseId !== id);
-      });
-    });
-    saveApp(app);
-    renderExercises();
-    renderRoutines();
-    return true;
-  }
-
-  // --- Routines & Days ---
-  function createRoutine(name) {
-    name = String(name||'').trim();
-    if (!name) return null;
-    const r = { id: uid('rt_'), name, days: [] };
-    app.routines.push(r);
-    saveApp(app);
-    renderRoutines();
-    return r;
-  }
-
-  function renameRoutine(id, newName) {
-    const r = app.routines.find(x=>x.id===id); if(!r) return false;
-    r.name = String(newName||'').trim() || r.name; saveApp(app); renderRoutines(); return true;
-  }
-
-  function deleteRoutine(id) {
-    if (!confirm('Routine löschen?')) return false;
-    app.routines = app.routines.filter(r=>r.id!==id); saveApp(app); renderRoutines(); return true;
-  }
-
-  function addDayToRoutine(routineId, dayName) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return null;
-    const d = { id: uid('day_'), name: String(dayName||'Tag').trim(), exercises: [] };
-    r.days.push(d); saveApp(app); renderRoutines(); return d;
-  }
-
-  function removeDay(routineId, dayId) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return false;
-    r.days = r.days.filter(d=>d.id!==dayId); saveApp(app); renderRoutines(); return true;
-  }
-
-  function addExerciseToDay(routineId, dayId, exerciseId, sets=3, reps=8, rest=90) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return null;
-    const d = r.days.find(x=>x.id===dayId); if(!d) return null;
-    const item = { id: uid('item_'), exerciseId, sets: Number(sets)||0, reps: Number(reps)||0, rest: Number(rest)||0 };
-    d.exercises.push(item); saveApp(app); renderRoutines(); return item;
-  }
-
-  function updateExerciseInDay(routineId, dayId, itemId, fields) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return false;
-    const d = r.days.find(x=>x.id===dayId); if(!d) return false;
-    const it = d.exercises.find(x=>x.id===itemId); if(!it) return false;
-    Object.assign(it, fields); saveApp(app); renderRoutines(); return true;
-  }
-
-  function removeExerciseFromDay(routineId, dayId, itemId) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return false;
-    const d = r.days.find(x=>x.id===dayId); if(!d) return false;
-    d.exercises = d.exercises.filter(x=>x.id!==itemId); saveApp(app); renderRoutines(); return true;
-  }
-
-  // --- Rendering & UI helpers (lightweight, uses prompts for complex input) ---
-  function renderExercises() {
-    const container = document.querySelector('#exercises .card .list');
-    if (!container) return;
-    // top controls
-    let controls = document.getElementById('exerciseControls');
-    if (!controls) {
-      controls = document.createElement('div'); controls.id = 'exerciseControls'; controls.style.display='flex'; controls.style.gap='8px'; controls.style.marginBottom='10px';
-      const input = document.createElement('input'); input.placeholder='Neue Übung (z.B. Kniebeuge)'; input.style.flex='1'; input.id='exerciseInput'; input.className='';
-      const btn = document.createElement('button'); btn.textContent='Hinzufügen'; btn.className='btn'; btn.addEventListener('click', ()=>{ const v=input.value.trim(); if(v) { addExercise(v); input.value=''; input.focus(); }});
-      controls.appendChild(input); controls.appendChild(btn);
-      container.parentElement.insertBefore(controls, container);
-    }
-
-    container.innerHTML = '';
-    app.exercises.forEach(ex => {
-      const li = document.createElement('li');
-      const left = document.createElement('div'); left.className='list-left';
-      const meta = document.createElement('div'); meta.className='meta'; meta.textContent = ex.name;
-      left.appendChild(meta);
-      const right = document.createElement('div'); right.className='list-right';
-      const edit = document.createElement('button'); edit.className='btn ghost'; edit.textContent='Umbenennen'; edit.style.marginRight='6px';
-      edit.addEventListener('click', ()=>{
-        const n = prompt('Neuer Name für Übung', ex.name); if (n) renameExercise(ex.id, n);
-      });
-      const del = document.createElement('button'); del.className='btn ghost'; del.textContent='Löschen'; del.addEventListener('click', ()=>{ deleteExercise(ex.id); });
-      right.appendChild(edit); right.appendChild(del);
-      li.appendChild(left); li.appendChild(right);
-      container.appendChild(li);
-    });
-  }
-
-  function renderRoutines() {
-    const grid = document.querySelector('#routines .panel-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    // top add routine control
-    const addBox = document.createElement('div'); addBox.className='card';
-    const h = document.createElement('h3'); h.className='card-title'; h.textContent='Neue Routine';
-    const inp = document.createElement('input'); inp.placeholder='Routine Name (z.B. Push Day)'; inp.style.width='100%'; inp.style.marginTop='8px';
-    const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Erstellen'; btn.style.marginTop='8px'; btn.addEventListener('click', ()=>{ const v=inp.value.trim(); if(v){ createRoutine(v); inp.value=''; }});
-    addBox.appendChild(h); addBox.appendChild(inp); addBox.appendChild(btn);
-    grid.appendChild(addBox);
-
-    app.routines.forEach(r => {
-      const box = document.createElement('div'); box.className='card routine';
-      const title = document.createElement('h3'); title.className='card-title'; title.textContent = r.name;
-      const meta = document.createElement('p'); meta.className='muted'; meta.textContent = `${r.days.length} Trainingstag(e)`;
-      const actions = document.createElement('div'); actions.className='routine-actions';
-      const addDayBtn = document.createElement('button'); addDayBtn.className='btn'; addDayBtn.textContent='Tag hinzufügen'; addDayBtn.addEventListener('click', ()=>{
-        const dn = prompt('Name des Trainingstages (z.B. Push)'); if(dn) addDayToRoutine(r.id, dn);
-      });
-      const editBtn = document.createElement('button'); editBtn.className='btn ghost'; editBtn.textContent='Umbenennen'; editBtn.addEventListener('click', ()=>{ const n=prompt('Neuer Name', r.name); if(n) renameRoutine(r.id,n); });
-      const delBtn = document.createElement('button'); delBtn.className='btn ghost'; delBtn.textContent='Löschen'; delBtn.addEventListener('click', ()=>{ deleteRoutine(r.id); });
-      actions.appendChild(addDayBtn); actions.appendChild(editBtn); actions.appendChild(delBtn);
-
-      box.appendChild(title); box.appendChild(meta); box.appendChild(actions);
-
-      // days
-      if (r.days.length) {
-        r.days.forEach(d => {
-          const dayBox = document.createElement('div'); dayBox.style.marginTop='12px';
-          const dayHeader = document.createElement('div'); dayHeader.style.display='flex'; dayHeader.style.justifyContent='space-between';
-          const dn = document.createElement('div'); dn.innerHTML = `<strong>${d.name}</strong>`;
-          const dayActions = document.createElement('div');
-          const addEx = document.createElement('button'); addEx.className='btn'; addEx.textContent='Übung hinzufügen'; addEx.addEventListener('click', ()=>{ addExerciseToDayPrompt(r.id,d.id); });
-          const remDay = document.createElement('button'); remDay.className='btn ghost'; remDay.textContent='Tag löschen'; remDay.addEventListener('click', ()=>{ if(confirm('Tag löschen?')) removeDay(r.id,d.id); });
-          dayActions.appendChild(addEx); dayActions.appendChild(remDay);
-          dayHeader.appendChild(dn); dayHeader.appendChild(dayActions);
-          dayBox.appendChild(dayHeader);
-
-          // exercises in day
-          if (d.exercises.length) {
-            const ul = document.createElement('ul'); ul.style.margin='8px 0 0 16px'; ul.style.padding='0'; ul.style.listStyle='none';
-            d.exercises.forEach(it => {
-              const li = document.createElement('li'); li.style.display='flex'; li.style.justifyContent='space-between'; li.style.alignItems='center'; li.style.padding='6px 0';
-              const ex = app.exercises.find(e=>e.id===it.exerciseId);
-              const left = document.createElement('div'); left.innerHTML = `<div><strong>${ex?ex.name:'[gelöschte Übung]'}</strong></div><div class='muted'>${it.sets}x${it.reps} • Pause ${it.rest}s</div>`;
-              const right = document.createElement('div');
-              const edit = document.createElement('button'); edit.className='btn ghost'; edit.textContent='Edit'; edit.addEventListener('click', ()=>{ editExerciseItemPrompt(r.id,d.id,it.id); });
-              const del = document.createElement('button'); del.className='btn ghost'; del.textContent='Entfernen'; del.addEventListener('click', ()=>{ if(confirm('Übung entfernen?')) removeExerciseFromDay(r.id,d.id,it.id); });
-              right.appendChild(edit); right.appendChild(del);
-              li.appendChild(left); li.appendChild(right); ul.appendChild(li);
-            });
-            dayBox.appendChild(ul);
-          }
-
-          box.appendChild(dayBox);
-        });
-      }
-
-      grid.appendChild(box);
-    });
-  }
-
-  // --- Prompt helpers for adding exercises to days and editing items ---
-  function addExerciseToDayPrompt(routineId, dayId) {
-    if (!app.exercises.length) { alert('Keine Übungen vorhanden. Bitte zuerst Übungen hinzufügen.'); return; }
-    const list = app.exercises.map((e,i)=>`${i+1}. ${e.name}`).join('\n');
-    const pick = prompt('Wähle Übung (Nummer):\n' + list);
-    const idx = Number(pick) - 1;
-    if (Number.isNaN(idx) || idx < 0 || idx >= app.exercises.length) return;
-    const ex = app.exercises[idx];
-    const sets = Number(prompt('Sätze (z.B. 3)', '3')) || 3;
-    const reps = Number(prompt('Wiederholungen pro Satz (z.B. 8)', '8')) || 8;
-    const rest = Number(prompt('Pause in Sekunden (z.B. 90)', '90')) || 90;
-    addExerciseToDay(routineId, dayId, ex.id, sets, reps, rest);
-  }
-
-  function editExerciseItemPrompt(routineId, dayId, itemId) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return;
-    const d = r.days.find(x=>x.id===dayId); if(!d) return;
-    const it = d.exercises.find(x=>x.id===itemId); if(!it) return;
-    const sets = Number(prompt('Sätze', String(it.sets))) || it.sets;
-    const reps = Number(prompt('Wiederholungen', String(it.reps))) || it.reps;
-    const rest = Number(prompt('Pause in Sekunden', String(it.rest))) || it.rest;
-    updateExerciseInDay(routineId, dayId, itemId, {sets,reps,rest});
-  }
-
-  // ensure history exists
-  app.history = app.history || [];
-
-  // --- Live Workout / Gym Mode ---
-  let workoutSession = null; // {id, routineId, dayId, items:[{item,exercise,setsLeft,currentSet}], index}
-  let restTimerId = null;
-
-  function getLastPerformance(exerciseId) {
-    // return last entry for this exercise
-    const entries = app.history.filter(h => h.exerciseId === exerciseId).sort((a,b)=>b.t - a.t);
-    return entries.length ? entries[0] : null;
-  }
-
-  function recordPerformance(exerciseId, weight, reps, sets) {
-    const entry = { exerciseId, weight: Number(weight)||0, reps: Number(reps)||0, sets: Number(sets)||0, volume: (Number(weight)||0)*Number(reps)||0, t: Date.now() };
-    app.history.push(entry); saveApp(app);
-    detectPR(entry);
-  }
-
-  function detectPR(entry) {
-    // check by weight and by volume
-    const prev = app.history.filter(h=>h.exerciseId===entry.exerciseId && h.t < entry.t);
-    const maxWeight = prev.reduce((m,c)=>Math.max(m,c.weight||0),0);
-    const maxVolume = prev.reduce((m,c)=>Math.max(m,c.volume||0),0);
-    if (entry.weight > maxWeight || entry.volume > maxVolume) {
-      showPRGlow(entry.exerciseId);
-    }
-  }
-
-  function showPRGlow(exerciseId) {
-    // find any visible element with exercise name and add glow
-    const els = Array.from(document.querySelectorAll('.live-exercise-name'));
-    els.forEach(el=>{
-      if (el.dataset && el.dataset.exerciseId === exerciseId) {
-        el.classList.add('pr-glow');
-        setTimeout(()=>el.classList.remove('pr-glow'), 2200);
-      }
-    });
-  }
-
-  function renderLiveUI() {
-    const livePanel = document.getElementById('live');
-    if (!livePanel) return;
-    const card = livePanel.querySelector('.live-card');
-    if (!card) return;
-
-    // build workout controls area
-    let ctrl = document.getElementById('workoutControls');
-    if (!ctrl) {
-      ctrl = document.createElement('div'); ctrl.id='workoutControls'; ctrl.style.marginTop='12px';
-      const top = document.createElement('div'); top.style.display='flex'; top.style.gap='8px';
-
-      const routineSelect = document.createElement('select'); routineSelect.id='workoutRoutineSelect'; routineSelect.style.flex='1';
-      const emptyOpt = document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='Wähle eine Routine zum Starten...'; routineSelect.appendChild(emptyOpt);
-      app.routines.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.name; routineSelect.appendChild(o); });
-
-      const start = document.createElement('button'); start.className='btn'; start.id='workoutStartBtn'; start.textContent='Workout starten';
-      start.addEventListener('click', ()=>{
-        const rid = routineSelect.value; if(!rid) { alert('Bitte Routine wählen'); return; }
-        startWorkoutFromRoutine(rid);
-      });
-
-      top.appendChild(routineSelect); top.appendChild(start);
-      ctrl.appendChild(top);
-
-      // workout display area
-      const wdisplay = document.createElement('div'); wdisplay.id='workoutDisplay'; wdisplay.style.marginTop='14px';
-      ctrl.appendChild(wdisplay);
-
-      card.appendChild(ctrl);
-    }
-
-    // update routine select options when routines change
-    const sel = document.getElementById('workoutRoutineSelect'); if (sel) {
-      const current = sel.value;
-      sel.innerHTML=''; const emptyOpt = document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='Wähle eine Routine zum Starten...'; sel.appendChild(emptyOpt);
-      app.routines.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.name; sel.appendChild(o); });
-      sel.value = current;
-    }
-  }
-
-  function startWorkoutFromRoutine(routineId) {
-    const r = app.routines.find(x=>x.id===routineId); if(!r) return alert('Routine nicht gefunden');
-    // flatten first day for demo (could choose day selection). If no days, alert.
-    if(!r.days.length) return alert('Routine hat keine Trainingstage');
-    const day = r.days[0];
-    const items = day.exercises.map(it => ({ item: it, exercise: app.exercises.find(e=>e.id===it.exerciseId) }));
-    if(!items.length) return alert('Dieser Trainingstag enthält keine Übungen');
-
-    workoutSession = { id: uid('ws_'), routineId, dayId: day.id, items: items.map(i=>({ ...i, setsLeft: i.item.sets, currentSet: 1 })), index: 0 };
-    renderWorkoutState();
-  }
-
-  function renderWorkoutState() {
-    const display = document.getElementById('workoutDisplay'); if(!display) return;
-    display.innerHTML = '';
-    if(!workoutSession) return;
-    const cur = workoutSession.items[workoutSession.index]; if(!cur) return;
-
-    const exName = document.createElement('div'); exName.className='live-exercise-name'; exName.dataset.exerciseId = cur.exercise ? cur.exercise.id : '';
-    exName.innerHTML = `<div style="font-weight:800;font-size:1.1rem">${cur.exercise?cur.exercise.name:'[gelöscht]'}</div>`;
-    display.appendChild(exName);
-
-    // last performance hint
-    const last = cur.exercise ? getLastPerformance(cur.exercise.id) : null;
-    const hint = document.createElement('div'); hint.className='muted'; hint.style.marginTop='6px';
-    hint.textContent = last ? `Letzte: ${last.weight}kg × ${last.reps}` : 'Keine Referenz vorhanden';
-    display.appendChild(hint);
-
-    // controls: weight, reps, complete set
-    const form = document.createElement('div'); form.style.display='flex'; form.style.gap='8px'; form.style.marginTop='12px';
-    const weight = document.createElement('input'); weight.type='number'; weight.id='liveWeight'; weight.placeholder = last ? `${last.weight} kg` : 'Gewicht (kg)'; weight.style.flex='1';
-    const reps = document.createElement('input'); reps.type='number'; reps.id='liveReps'; reps.placeholder = last ? `${last.reps} Wdh` : 'Wdh'; reps.style.width='88px';
-    form.appendChild(weight); form.appendChild(reps);
-    display.appendChild(form);
-
-    const info = document.createElement('div'); info.style.marginTop='8px'; info.innerHTML = `<div class='muted'>Satz ${cur.currentSet} von ${cur.item.sets}</div>`;
-    display.appendChild(info);
-
-    const controls = document.createElement('div'); controls.style.display='flex'; controls.style.gap='8px'; controls.style.marginTop='10px';
-    const completeBtn = document.createElement('button'); completeBtn.className='btn'; completeBtn.textContent='Satz abgeschlossen';
-    completeBtn.addEventListener('click', ()=>{ completeSet(); });
-    const skipBtn = document.createElement('button'); skipBtn.className='btn ghost'; skipBtn.textContent='Nächste Übung'; skipBtn.addEventListener('click', ()=>{ nextExercise(); });
-    controls.appendChild(completeBtn); controls.appendChild(skipBtn);
-    display.appendChild(controls);
-
-    // timer display (reuse #timer)
-    const timerEl = document.getElementById('timer'); if (timerEl) timerEl.textContent = formatTime(cur.item.rest || 0);
-  }
-
-  function completeSet() {
-    if (!workoutSession) return;
-    const cur = workoutSession.items[workoutSession.index]; if(!cur) return;
-    const weightEl = document.getElementById('liveWeight'); const repsEl = document.getElementById('liveReps');
-    const weight = Number(weightEl.value) || Number((getLastPerformance(cur.exercise.id)||{}).weight) || 0;
-    const reps = Number(repsEl.value) || Number((getLastPerformance(cur.exercise.id)||{}).reps) || 0;
-    // record this set
-    recordPerformance(cur.exercise.id, weight, reps, cur.item.sets);
-
-    // decrement sets left and start rest timer
-    cur.setsLeft = Math.max(0, cur.setsLeft - 1);
-    cur.currentSet += 1;
-    startRestCountdown(cur.item.rest || 60, ()=>{
-      // after rest, if setsLeft>0 continue same exercise, else advance
-      if (cur.setsLeft > 0) {
-        renderWorkoutState();
-      } else {
-        nextExercise();
-      }
-    });
-    renderWorkoutState();
-  }
-
-  function nextExercise() {
-    if (!workoutSession) return;
-    if (workoutSession.index < workoutSession.items.length - 1) {
-      workoutSession.index += 1; renderWorkoutState();
-    } else {
-      alert('Workout abgeschlossen!'); workoutSession = null; renderWorkoutState();
-    }
-  }
-
-  function startRestCountdown(seconds, cb) {
-    clearInterval(restTimerId);
-    const timerEl = document.getElementById('timer'); if (!timerEl) { if(cb) cb(); return; }
-    let remaining = Number(seconds) || 0;
-    timerEl.dataset.resting = 'true';
-    timerEl.textContent = formatTime(remaining);
-    restTimerId = setInterval(()=>{
-      remaining -= 1; if (remaining <= 0) { clearInterval(restTimerId); timerEl.dataset.resting=''; if(cb) cb(); }
-      timerEl.textContent = formatTime(Math.max(0,remaining));
-    },1000);
-  }
-
-  function formatTime(s) { const mm = String(Math.floor(s/60)).padStart(2,'0'); const ss = String(s%60).padStart(2,'0'); return `${mm}:${ss}`; }
-
-  // --- Statistics (Chart rendering) & Export/Import ---
-  let statsChart = null;
-
-  function computeVolumeByDay(days) {
-    const now = new Date();
-    const msPerDay = 24*60*60*1000;
-    const labels = [];
-    const volumes = [];
-    for (let i = days-1; i>=0; i--) {
-      const d = new Date(now.getTime() - i*msPerDay);
-      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-      const dayEnd = dayStart + msPerDay;
-      labels.push(d.toLocaleDateString());
-      const vol = app.history.reduce((sum, h)=>{
-        if (h.t >= dayStart && h.t < dayEnd) return sum + (h.volume||0);
-        return sum;
-      },0);
-      volumes.push(vol);
-    }
-    return { labels, volumes };
-  }
-
-  function renderStatsChart(days=30) {
-    const canvas = document.getElementById('statsChart'); if(!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const data = computeVolumeByDay(Number(days)||30);
-    const gradient = ctx.createLinearGradient(0,0,0,canvas.height);
-    gradient.addColorStop(0,'rgba(110,231,183,0.28)');
-    gradient.addColorStop(1,'rgba(110,231,183,0.02)');
-
-    const cfg = {
-      type: 'line',
-      data: { labels: data.labels, datasets: [{ label: 'Volumen (kg)', data: data.volumes, backgroundColor: gradient, borderColor: 'rgba(110,231,183,0.9)', fill:true, tension:0.25 }] },
-      options: { responsive:true, maintainAspectRatio:false, scales:{y:{beginAtZero:true, ticks:{color:'rgba(255,255,255,0.8)'}}, x:{ticks:{color:'rgba(255,255,255,0.8)'}}}, plugins:{legend:{labels:{color:'rgba(255,255,255,0.9)'}}}}
-    };
-
-    if (statsChart) { statsChart.data.labels = cfg.data.labels; statsChart.data.datasets = cfg.data.datasets; statsChart.update(); }
-    else statsChart = new Chart(ctx, cfg);
-  }
-
-  function exportData() {
-    const filename = `tracker-export-${new Date().toISOString().slice(0,10)}.json`;
-    const blob = new Blob([JSON.stringify(app, null, 2)], {type:'application/json'});
+    }catch(e){console.error('load error',e);return null}
+  },
+  save(state){
+    localStorage.setItem(STORE_KEY,JSON.stringify(state));
+  },
+  export(){
+    const data = storage.load()||defaultState();
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    const a = document.createElement('a');a.href=url;a.download='app.json';a.click();URL.revokeObjectURL(url);
   }
+};
 
-  function importDataFromText(text) {
-    try {
-      const parsed = JSON.parse(text);
-      if (!parsed || typeof parsed !== 'object') throw new Error('Ungültiges Format');
-      // basic validation: must have exercises and routines
-      parsed.exercises = parsed.exercises || [];
-      parsed.routines = parsed.routines || [];
-      parsed.history = parsed.history || [];
-      if (!confirm('Daten importieren und aktuellen Speicher ersetzen?')) return;
-      app = parsed; saveApp(app); renderAll();
-      alert('Import erfolgreich');
-    } catch (e) {
-      alert('Import fehlgeschlagen: ' + e.message);
-    }
-  }
-
-  function renderStatsUI() {
-    const statsPanel = document.getElementById('stats'); if(!statsPanel) return;
-    const range = document.getElementById('statsRange'); const exportBtn = document.getElementById('exportBtn'); const importBtn = document.getElementById('importBtn'); const importFile = document.getElementById('importFile');
-    if (range) range.addEventListener('change', ()=> renderStatsChart(range.value));
-    if (exportBtn) exportBtn.addEventListener('click', exportData);
-    if (importBtn && importFile) { importBtn.addEventListener('click', ()=> importFile.click()); importFile.addEventListener('change', (e)=>{
-      const f = e.target.files && e.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = ()=> importDataFromText(reader.result); reader.readAsText(f);
-    }); }
-
-    // initial chart
-    renderStatsChart(Number((range && range.value) || 30));
-  }
-
-  // render on load
-  function renderAll(){ renderExercises(); renderRoutines(); renderLiveUI(); renderStatsUI(); }
-
-  // Initialize UI when DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderAll);
-  } else renderAll();
-
-  // Expose API for debugging
-  window.trackerApp = {
-    loadApp, saveApp, addExercise, renameExercise, deleteExercise,
-    createRoutine, addDayToRoutine, addExerciseToDay, updateExerciseInDay, removeExerciseFromDay,
-    startWorkoutFromRoutine, recordPerformance, exportData, importDataFromText,
-    get state(){ return app; }
-  };
-
+let state = storage.load() || (function(){
+  const s = defaultState();
+  // seed data
+  s.exercises.push({id:uid(),name:'Bench Press'});
+  s.exercises.push({id:uid(),name:'Back Squat'});
+  s.exercises.push({id:uid(),name:'Deadlift'});
+  s.routines.push({id:uid(),name:'Push Day A',tags:['push'],defaultRest:90,items:[{id:uid(),exerciseId:s.exercises[0].id,sets:4,reps:'6-8',rest:90}]});
+  storage.save(s);
+  return s;
 })();
+
+/* Basic DOM helpers */
+const $ = sel=>document.querySelector(sel);
+const $$ = sel=>Array.from(document.querySelectorAll(sel));
+
+/* Tabs */
+$$('.tab').forEach(btn=>btn.addEventListener('click',e=>{
+  $$('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  const tab = btn.dataset.tab;
+  $$('.panel').forEach(p=>p.classList.add('hidden'));
+  $(`#${tab}`).classList.remove('hidden');
+}));
+
+/* Exercises */
+const exerciseForm = $('#exerciseForm');
+const exerciseList = $('#exerciseList');
+const exerciseName = $('#exerciseName');
+
+function renderExercises(){
+  exerciseList.innerHTML='';
+  state.exercises.forEach(ex=>{
+    const li = document.createElement('li');li.className='item';
+    li.innerHTML = `<span>${ex.name}</span><div class="row"><button data-id="${ex.id}" class="btn ghost edit">Edit</button><button data-id="${ex.id}" class="btn ghost del">Del</button></div>`;
+    exerciseList.appendChild(li);
+  });
+}
+
+exerciseForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const name = exerciseName.value.trim();
+  if(!name) return;
+  state.exercises.push({id:uid(),name});
+  storage.save(state);renderExercises();populateExerciseSelects();exerciseName.value='';
+});
+
+exerciseList.addEventListener('click',e=>{
+  const id = e.target.dataset.id; if(!id) return;
+  if(e.target.classList.contains('del')){
+    state.exercises = state.exercises.filter(x=>x.id!==id);storage.save(state);renderExercises();populateExerciseSelects();
+  }
+  if(e.target.classList.contains('edit')){
+    const ex = state.exercises.find(x=>x.id===id);const n = prompt('Rename exercise',ex.name);if(n){ex.name=n;storage.save(state);renderExercises();populateExerciseSelects();}
+  }
+});
+
+/* Routines */
+const routineForm = $('#routineForm');
+const routineName = $('#routineName');
+const routineTag = $('#routineTag');
+const routineRest = $('#routineRest');
+const routineExerciseSelect = $('#routineExerciseSelect');
+const routineSets = $('#routineSets');
+const routineReps = $('#routineReps');
+const routineItemRest = $('#routineItemRest');
+const addRoutineItem = $('#addRoutineItem');
+const routineItems = $('#routineItems');
+const routineList = $('#routineList');
+
+let workingItems = [];
+
+function populateExerciseSelects(){
+  [routineExerciseSelect,$('#liveRoutineSelect')].forEach(sel=>{
+    if(!sel) return;sel.innerHTML='';
+    state.exercises.forEach(ex=>{const opt=document.createElement('option');opt.value=ex.id;opt.textContent=ex.name;sel.appendChild(opt);});
+  });
+}
+
+function renderRoutineItems(){
+  routineItems.innerHTML='';
+  workingItems.forEach(it=>{
+    const el = document.createElement('div');el.className='item';el.innerHTML=`<div><strong>${(state.exercises.find(x=>x.id===it.exerciseId)||{}).name||'—'}</strong><div class="small">${it.sets}× ${it.reps} • rest ${it.rest||'inherit'}s</div></div><div><button data-id="${it.id}" class="btn ghost del">Remove</button></div>`;
+    routineItems.appendChild(el);
+  });
+}
+
+addRoutineItem.addEventListener('click',e=>{e.preventDefault();const ex=routineExerciseSelect.value; if(!ex) return;const sets=parseInt(routineSets.value)||3;const reps=routineReps.value||'8';const rest=parseInt(routineItemRest.value)||null;workingItems.push({id:uid(),exerciseId:ex,sets,reps,rest});renderRoutineItems();routineSets.value='';routineReps.value='';routineItemRest.value='';});
+
+routineItems.addEventListener('click',e=>{const id=e.target.dataset.id; if(!id) return; workingItems = workingItems.filter(i=>i.id!==id);renderRoutineItems();});
+
+routineForm.addEventListener('submit',e=>{e.preventDefault();const name=routineName.value.trim();if(!name) return; const tags=(routineTag.value||'').split(',').map(s=>s.trim()).filter(Boolean); const dr = parseInt(routineRest.value)||null; state.routines.push({id:uid(),name,tags,defaultRest:dr,items:workingItems}); workingItems=[]; renderRoutines(); storage.save(state); routineForm.reset(); populateExerciseSelects();});
+
+function renderRoutines(){
+  routineList.innerHTML='';
+  $('#liveRoutineSelect').innerHTML='';
+  state.routines.forEach(r=>{
+    const el=document.createElement('div');el.className='item';el.innerHTML=`<div><strong>${r.name}</strong><div class="small">${r.tags.join(', ')} • ${r.items.length} items</div></div><div class="row"><button data-id="${r.id}" class="btn ghost start">Start</button><button data-id="${r.id}" class="btn ghost del">Delete</button></div>`;
+    routineList.appendChild(el);
+    const opt=document.createElement('option');opt.value=r.id;opt.textContent=r.name;$('#liveRoutineSelect').appendChild(opt);
+  });
+}
+
+routineList.addEventListener('click',e=>{const id=e.target.dataset.id; if(!id) return; if(e.target.classList.contains('del')){state.routines=state.routines.filter(r=>r.id!==id);storage.save(state);renderRoutines();} if(e.target.classList.contains('start')){startWorkoutById(id);} });
+
+/* Live workout */
+const startWorkout = $('#startWorkout');
+const workoutArea = $('#workoutArea');
+
+function startWorkoutById(id){const r = state.routines.find(x=>x.id===id); if(!r) return; openWorkout(r);} 
+
+startWorkout.addEventListener('click',()=>{const id = $('#liveRoutineSelect').value; if(!id) return; startWorkoutById(id);});
+
+function openWorkout(routine){
+  workoutArea.innerHTML=''; workoutArea.classList.remove('hidden');
+  const wrapper = document.createElement('div'); wrapper.className='col';
+  routine.items.forEach((it,idx)=>{
+    const ex = state.exercises.find(e=>e.id===it.exerciseId) || {name:'—'};
+    const card = document.createElement('div');card.className='workout-item';
+    const title = document.createElement('div'); title.innerHTML = `<strong>${ex.name}</strong><div class='small'>${it.sets}× ${it.reps}</div>`;
+    const setsRow = document.createElement('div'); setsRow.className='sets-row';
+    for(let s=1;s<=it.sets;s++){
+      const btn = document.createElement('button'); btn.className='set-btn'; btn.textContent = `${s}`;
+      btn.dataset.exerciseId = it.exerciseId; btn.dataset.setIndex = s-1; btn.dataset.routineId = routine.id; btn.addEventListener('click',onSetClick);
+      setsRow.appendChild(btn);
+    }
+    card.appendChild(title);card.appendChild(setsRow);wrapper.appendChild(card);
+  });
+  workoutArea.appendChild(wrapper);
+}
+
+/* Timer + PR detection */
+let activeTimer = null;
+function onSetClick(e){
+  const btn = e.currentTarget;
+  if(btn.classList.contains('done')) return;
+  // mark done and open input for weight/reps
+  btn.classList.add('done');
+  const weight = prompt('Weight (numeric)')||'';
+  const reps = prompt('Reps')||'';
+  // save session entry
+  const sess = {id:uid(),date:new Date().toISOString(),entries:[{exerciseId:btn.dataset.exerciseId,setIndex:btn.dataset.setIndex,weight:Number(weight)||null,reps:reps}]};
+  state.sessions.push(sess); storage.save(state);
+  // PR detection: check max weight for this exercise
+  const exEntries = state.sessions.flatMap(s=>s.entries).filter(en=>en.exerciseId===btn.dataset.exerciseId && en.weight);
+  const max = Math.max(...exEntries.map(e=>e.weight||0));
+  if(Number(weight) && Number(weight)>=max){
+    showPR(exEntries.length?max:Number(weight));
+  }
+  // start rest timer
+  const parentRoutine = state.routines.find(r=>r.id===btn.dataset.routineId);
+  const item = parentRoutine.items.find(it=>it.exerciseId===btn.dataset.exerciseId);
+  const rest = (item && item.rest) || parentRoutine.defaultRest || state.settings.defaultRest || 60;
+  startRestTimer(rest, btn);
+}
+
+function startRestTimer(seconds, refBtn){
+  if(activeTimer) {clearInterval(activeTimer.id); activeTimer = null;}
+  const ring = createRing(seconds);
+  refBtn.appendChild(ring.container);
+  let t = seconds;
+  const id = setInterval(()=>{
+    t--; updateRing(ring,t/seconds);
+    if(t<=0){clearInterval(id); ring.container.remove(); activeTimer=null; buzz();}
+  },1000);
+  activeTimer = {id};
+}
+
+function buzz(){try{if(navigator.vibrate) navigator.vibrate(200);}catch(e){} const a = new Audio(); const ctx = new (window.AudioContext||window.webkitAudioContext)(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.type='sine'; o.frequency.value=880; g.gain.value=0.0001; o.start(); g.gain.exponentialRampToValueAtTime(0.05,ctx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.3); o.stop(ctx.currentTime+0.35);
+}
+
+function createRing(seconds){
+  const ns = document.createElement('div'); ns.className='ring';
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg'); svg.setAttribute('viewBox','0 0 36 36'); svg.style.width='56px'; svg.style.height='56px';
+  const bg = document.createElementNS(svgNS,'path'); bg.setAttribute('d','M18 2a16 16 0 1 1 0 32 16 16 0 1 1 0-32'); bg.setAttribute('fill','none'); bg.setAttribute('stroke','rgba(255,255,255,0.04)'); bg.setAttribute('stroke-width','2');
+  const fg = document.createElementNS(svgNS,'path'); fg.setAttribute('d','M18 2a16 16 0 1 1 0 32 16 16 0 1 1 0-32'); fg.setAttribute('fill','none'); fg.setAttribute('stroke',getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()); fg.setAttribute('stroke-width','2'); fg.setAttribute('stroke-linecap','round'); fg.style.transition='stroke-dashoffset 1s linear'; fg.style.strokeDasharray='100'; fg.style.strokeDashoffset='0';
+  svg.appendChild(bg); svg.appendChild(fg); ns.appendChild(svg);
+  return {container:ns, fg};
+}
+function updateRing(ring,ratio){ const v = Math.max(0,Math.min(1,ratio)); ring.fg.style.strokeDashoffset = '' + (100 - Math.round(v*100)); }
+
+function showPR(val){
+  const c=document.createElement('div');c.className='confetti'; c.innerHTML = `<div style="position:fixed;left:50%;top:20%;transform:translateX(-50%);background:linear-gradient(90deg,var(--accent),var(--accent-2));padding:12px 20px;border-radius:12px;box-shadow:var(--shadow);">New PR: ${val}</div>`;
+  document.body.appendChild(c); setTimeout(()=>c.remove(),2200);
+}
+
+/* Stats */
+const statsRange = $('#statsRange');
+const statsChartEl = $('#statsChart');
+let statsChart = null;
+
+function computeVolume(days){
+  const entries = state.sessions.flatMap(s=>s.entries.map(en=>({...en,date:new Date(s.date)})));
+  const cutoff = days==='all'?new Date(0):new Date(Date.now()- (parseInt(days)||30)*24*60*60*1000);
+  const filtered = entries.filter(e=>e.date>=cutoff && e.weight && e.reps);
+  // group by day
+  const map = {};
+  filtered.forEach(e=>{
+    const d = e.date.toISOString().slice(0,10);
+    map[d] = (map[d]||0) + ( (e.weight||0) * (parseInt(String(e.reps))||1) );
+  });
+  const labels = Object.keys(map).sort();
+  const data = labels.map(l=>map[l]);
+  return {labels,data};
+}
+
+function renderStats(){
+  const range = statsRange.value;
+  const v = computeVolume(range);
+  if(statsChart) statsChart.destroy();
+  statsChart = new Chart(statsChartEl.getContext('2d'),{
+    type:'line',data:{labels:v.labels,datasets:[{label:'Volume',data:v.data,backgroundColor:'rgba(110,231,255,0.08)',borderColor:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),tension:0.25,fill:true}]},options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+}
+
+statsRange.addEventListener('change',renderStats);
+
+/* Export/Import */
+$('#exportBtn').addEventListener('click',()=>storage.export());
+$('#importBtn').addEventListener('click',()=>$('#importFile').click());
+$('#importFile').addEventListener('change',async(e)=>{
+  const f = e.target.files[0]; if(!f) return; const txt = await f.text(); try{ const d=JSON.parse(txt); localStorage.setItem(STORE_KEY,JSON.stringify(d)); location.reload(); }catch(err){alert('Invalid JSON')}
+});
+
+/* Settings */
+$('#defaultRestInput').value = state.settings.defaultRest;
+$('#unitsSelect').value = state.settings.units;
+$('#themeSelect').value = state.settings.theme;
+$('#defaultRestInput').addEventListener('change',()=>{state.settings.defaultRest = parseInt($('#defaultRestInput').value)||60; storage.save(state);});
+$('#unitsSelect').addEventListener('change',()=>{state.settings.units=$('#unitsSelect').value;storage.save(state);});
+$('#themeSelect').addEventListener('change',()=>{state.settings.theme=$('#themeSelect').value;storage.save(state);});
+
+$('#clearData').addEventListener('click',()=>{ if(confirm('Clear all data?')){ localStorage.removeItem(STORE_KEY); location.reload(); }});
+
+/* Init */
+function init(){ renderExercises(); populateExerciseSelects(); renderRoutines(); renderStats(); }
+
+document.addEventListener('DOMContentLoaded',init);
