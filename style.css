@@ -1,73 +1,287 @@
-:root{
-  --bg:#070707;
-  --card:#0e0e10;
-  --muted:#94a3b8;
-  --glass:rgba(255,255,255,0.04);
-  --accent:#6ee7ff; /* Electric blue */
-  --accent-2:#b57bff; /* Neon violet */
-  --success:#34d399;
-  --danger:#fb7185;
-  --radius:14px;
-  --glass-border:rgba(255,255,255,0.04);
-  --text:#e6eef8;
-  --shadow:0 6px 20px rgba(2,6,23,0.6);
-  --glass-blur:8px;
-  --gap:12px;
-  --max-width:900px;
+:root {
+  --bg: #0b0f14;
+  --panel: #121a22;
+  --panel-strong: #1b2430;
+  --border: #2f3b46;
+  --text: #edf2f7;
+  --muted: #9aa8b6;
+  --accent: #4ade80;
+  --accent-soft: rgba(74, 222, 128, 0.12);
+  --danger: #ef4444;
+  --shadow: rgba(0, 0, 0, 0.25);
 }
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;
-  font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-  background:linear-gradient(180deg,var(--bg),#0b0b0c 60%);
-  color:var(--text);
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
-  display:flex;align-items:center;justify-content:center;padding:24px;
+
+* {
+  box-sizing: border-box;
 }
-.app-root{width:100%;max-width:var(--max-width);display:flex;flex-direction:column;gap:16px}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);backdrop-filter:blur(var(--glass-blur));box-shadow:var(--shadow)}
-.brand{margin:0;font-weight:700;letter-spacing:1px}
-.content{display:flex;flex-direction:column;gap:12px}
-.tabs{display:flex;gap:8px;overflow:auto}
-.tab{background:transparent;border:0;padding:8px 12px;color:var(--muted);border-radius:10px}
-.tab.active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#020617;font-weight:600}
-.panel{display:block}
-.hidden{display:none}
-.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border:1px solid var(--glass-border)}
-.row{display:flex;gap:10px;align-items:center}
-.col{display:flex;flex-direction:column;gap:10px}
-input,select,button{font:inherit}
-input,select{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:10px;color:var(--text);outline:none}
-input:focus,select:focus{box-shadow:0 4px 14px rgba(0,0,0,0.6), 0 0 0 4px rgba(110,231,255,0.06);border-color:var(--accent)}
-.btn{background:transparent;color:var(--text);padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
-.btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#020617;border:none}
-.btn.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.03)}
-.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.list .item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
-.small{font-size:13px;color:var(--muted)}
-.panel-head h2{margin:0 0 6px 0}
-.footer{display:flex;justify-content:center;color:var(--muted);padding:8px}
-.hidden{display:none}
 
-/* Workout card */
-.workout-item{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.008));position:relative}
-.sets-row{display:flex;gap:8px;flex-wrap:wrap}
-.set-btn{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:10px;color:var(--text);display:flex;gap:8px;align-items:center}
-.set-btn.done{transform:scale(0.98);opacity:0.6;text-decoration:line-through}
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top, rgba(74, 222, 128, 0.12), transparent 30%),
+    var(--bg);
+  color: var(--text);
+  font-family: Inter, "Segoe UI", sans-serif;
+}
 
-/* Progress ring */
-.ring{width:56px;height:56px;display:inline-block}
+body {
+  padding: 24px;
+}
 
-/* Animations */
-@keyframes pop {from{transform:scale(.96)}to{transform:scale(1)}}
-.btn, .item, input{transition:all .18s ease;will-change:transform,opacity}
-.confetti{pointer-events:none;position:fixed;left:0;top:0;width:100%;height:100%;z-index:9999}
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
-/* Mobile tweaks */
-@media (max-width:640px){body{padding:12px}.topbar{padding:8px}.tabs{gap:6px}.app-root{padding-bottom:48px}}
+.header {
+  margin-bottom: 20px;
+}
 
-/* tiny utilities */
-.muted{color:var(--muted)}
-.badge{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;font-size:12px}
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+h1, h2, h3, p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: rgba(18, 26, 34, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 14px 28px var(--shadow);
+}
+
+.card.wide {
+  grid-column: 1 / -1;
+}
+
+h2 {
+  margin-bottom: 18px;
+  font-size: 1.25rem;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+
+input, select {
+  width: 100%;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+}
+
+input:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #08130b;
+  font-weight: 700;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+button.small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+li:last-child {
+  border-bottom: none;
+}
+
+li.empty {
+  justify-content: center;
+  color: var(--muted);
+  font-size: 0.96rem;
+}
+
+.day-card {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.day-card:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.day-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.day-exercise-list {
+  margin: 8px 0;
+  padding-left: 0;
+}
+
+.day-exercise-list li {
+  padding: 8px 0;
+}
+
+.day-toolbar {
+  display: flex;
+  gap: 10px;
+}
+
+.workout-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.workout-header label {
+  min-width: 90px;
+  color: var(--muted);
+}
+
+#workout-list {
+  display: grid;
+  gap: 12px;
+}
+
+.workout-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.workout-row .exercise-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.workout-row .inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 320px);
+}
+
+.workout-row .inputs label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.workout-row input {
+  width: 110px;
+  min-width: 90px;
+}
+
+.empty-state {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 16px;
+  }
+
+  .input-row,
+  .day-toolbar,
+  .workout-row,
+  .workout-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workout-row .inputs {
+    width: 100%;
+  }
+
+  .workout-row .inputs label {
+    justify-content: space-between;
+  }
+
+  .workout-row input {
+    width: 100%;
+  }
+}
